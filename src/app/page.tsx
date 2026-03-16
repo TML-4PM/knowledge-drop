@@ -2,10 +2,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 type Status = 'idle' | 'submitting' | 'done' | 'error';
-type HistoryItem = { id: string; proj: string; chars: number; ts: string; url?: string };
-
 const PROJECTS = ['','maat','rdti','level23','research','signal','infra','product','finance'];
-const LS_KEY = 't4h_drop_history';
 
 export default function DropZone() {
   const [text, setText]           = useState('');
@@ -17,68 +14,43 @@ export default function DropZone() {
   const [jobId, setJobId]         = useState('');
   const [errMsg, setErrMsg]       = useState('');
   const [dragOver, setDragOver]   = useState(false);
-  const [history, setHistory]     = useState<HistoryItem[]>([]);
+  const [charCount, setCharCount] = useState(0);
+  const [history, setHistory]     = useState<{id:string;proj:string;chars:number;ts:string}[]>([]);
   const textRef = useRef<HTMLTextAreaElement>(null);
 
-  // Persist history to localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(LS_KEY);
-      if (stored) setHistory(JSON.parse(stored));
-    } catch {}
-  }, []);
-
-  const addHistory = (item: HistoryItem) => {
-    setHistory(prev => {
-      const next = [item, ...prev].slice(0, 20);
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-
-  const clearHistory = () => {
-    setHistory([]);
-    try { localStorage.removeItem(LS_KEY); } catch {}
-  };
-
-  const charCount = text.length;
-
-  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const clip = e.clipboardData;
     const pasted = clip.getData('text/plain');
     if (/^https?:\/\//.test(pasted.trim()) && !pasted.includes('\n')) {
-      e.preventDefault();
-      setUrl(pasted.trim());
+      e.preventDefault(); setUrl(pasted.trim()); return;
     }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
+    e.preventDefault(); setDragOver(false);
     const dropped = e.dataTransfer.getData('text/plain');
-    if (dropped) setText(prev => prev ? prev + '\n\n' + dropped : dropped);
+    if (dropped) { setText(p => p ? p + '\n\n' + dropped : dropped); setCharCount(p => p + dropped.length); }
     const droppedUrl = e.dataTransfer.getData('text/uri-list');
     if (droppedUrl && !url) setUrl(droppedUrl.split('\n')[0].trim());
   }, [url]);
 
   const reset = () => {
     setText(''); setUrl(''); setProject(''); setTags(''); setNotes('');
-    setStatus('idle'); setJobId(''); setErrMsg('');
+    setStatus('idle'); setJobId(''); setErrMsg(''); setCharCount(0);
     setTimeout(() => textRef.current?.focus(), 50);
   };
 
-  const submit = useCallback(async () => {
-    if (!text.trim()) { textRef.current?.focus(); return; }
+  const submit = async () => {
+    if (!text.trim() || status === 'submitting') return;
     setStatus('submitting');
     try {
       const res = await fetch('/api/enqueue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          raw_text: text,
-          source_url: url || null,
+          raw_text: text, source_url: url || null,
           project: project || null,
-          topic_tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : null,
+          topic_tags: tags ? tags.split(',').map(t=>t.trim()).filter(Boolean) : null,
           notes: notes || null,
         }),
       });
@@ -86,159 +58,218 @@ export default function DropZone() {
       if (!res.ok || data.error) throw new Error(data.error || 'enqueue failed');
       setJobId(data.job_id);
       setStatus('done');
-      addHistory({
-        id: data.job_id,
-        proj: project || '—',
-        chars: charCount,
-        ts: new Date().toLocaleString('en-AU', { dateStyle:'short', timeStyle:'short' }),
-        url: url || undefined,
-      });
-    } catch(e: any) {
-      setErrMsg(e.message);
-      setStatus('error');
-    }
-  }, [text, url, project, tags, notes, charCount]);
+      setHistory(h => [{id:data.job_id,proj:project||'—',chars:charCount,ts:new Date().toLocaleTimeString()},...h].slice(0,10));
+    } catch(e:any) { setErrMsg(e.message); setStatus('error'); }
+  };
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [submit]);
+    const h = (e: KeyboardEvent) => { if ((e.metaKey||e.ctrlKey) && e.key==='Enter') submit(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [text, url, project, tags, notes]);
 
-  const codeBlockCount = (text.match(/```/g) || []).length >> 1;
-  const paraCount = text.split(/\n\n+/).filter(p => p.trim().length > 80).length;
+  const codeBlockCount = (text.match(/```/g)||[]).length >> 1;
+  const paraCount = text.split(/\n\n+/).filter(p=>p.trim().length>80).length;
+
+  const inputStyle = {
+    background: 'var(--surface)',
+    border: '1px solid var(--border)',
+    borderRadius: '4px',
+    padding: '9px 12px',
+    fontFamily: 'var(--mono)',
+    fontSize: '12px',
+    color: 'var(--text)',
+    outline: 'none',
+    width: '100%',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+  };
+
+  const labelStyle = {
+    fontFamily: 'var(--mono)',
+    fontSize: '10px',
+    color: 'var(--text-dim)',
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase' as const,
+    marginBottom: '5px',
+    display: 'block',
+  };
 
   return (
     <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',background:'var(--bg)'}}>
-      <div style={{position:'fixed',inset:0,pointerEvents:'none',zIndex:0,overflow:'hidden'}}>
-        <div style={{position:'absolute',left:0,right:0,height:'2px',background:'linear-gradient(transparent,rgba(245,166,35,0.04),transparent)',animation:'scan 8s linear infinite'}}/>
-      </div>
 
-      <header style={{borderBottom:'1px solid var(--border)',padding:'14px 28px',display:'flex',alignItems:'center',gap:'16px',position:'relative',zIndex:1}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--amber)',letterSpacing:'0.2em',textTransform:'uppercase'}}>T4H // KNOWLEDGE INTAKE</div>
-        <div style={{width:'1px',height:'16px',background:'var(--border-hi)'}}/>
-        <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.1em'}}>DROP ZONE v1.1</div>
+      {/* Header */}
+      <header style={{borderBottom:'1px solid var(--border)',padding:'0 24px',display:'flex',alignItems:'center',gap:'0',background:'var(--surface)',boxShadow:'var(--shadow)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:'12px',padding:'14px 0',borderRight:'1px solid var(--border)',paddingRight:'20px',marginRight:'20px'}}>
+          <div style={{width:'8px',height:'8px',background:'var(--accent)',borderRadius:'1px'}}/>
+          <span style={{fontFamily:'var(--mono)',fontSize:'11px',fontWeight:600,color:'var(--text)',letterSpacing:'0.12em'}}>
+            T4H // KNOWLEDGE INTAKE
+          </span>
+        </div>
+        <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)',letterSpacing:'0.1em'}}>
+          DROP ZONE v1.0
+        </span>
         <div style={{marginLeft:'auto',display:'flex',gap:'20px',alignItems:'center'}}>
-          <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>WORKER<span style={{color:'var(--green)',marginLeft:'6px'}}>● LIVE</span></div>
-          <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>POLL <span style={{color:'var(--amber)'}}>5MIN</span></div>
+          <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>
+            WORKER <span style={{color:'var(--green)',fontWeight:600}}>● LIVE</span>
+          </span>
+          <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)'}}>
+            POLL <span style={{color:'var(--amber)',fontWeight:500}}>5 MIN</span>
+          </span>
         </div>
       </header>
 
-      <div style={{display:'flex',flex:1,gap:0,position:'relative',zIndex:1}}>
-        <main style={{flex:1,padding:'32px 28px',display:'flex',flexDirection:'column',gap:'20px',maxWidth:'800px'}}>
+      <div style={{display:'flex',flex:1,gap:0}}>
 
-          {status === 'done' && (
-            <div style={{animation:'fadeUp 0.3s ease',background:'rgba(74,222,128,0.06)',border:'1px solid rgba(74,222,128,0.2)',borderRadius:'4px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px'}}>
-              <span style={{color:'var(--green)',fontFamily:'var(--mono)',fontSize:'12px'}}>✓ QUEUED</span>
+        {/* Main */}
+        <main style={{flex:1,padding:'28px 24px',display:'flex',flexDirection:'column',gap:'16px',maxWidth:'820px'}}>
+
+          {/* Banner */}
+          {status==='done' && (
+            <div style={{animation:'fadeUp 0.25s ease',background:'var(--green-bg)',border:'1px solid #a8d8aa',borderRadius:'4px',padding:'12px 16px',display:'flex',alignItems:'center',gap:'12px',boxShadow:'var(--shadow)'}}>
+              <span style={{color:'var(--green)',fontFamily:'var(--mono)',fontSize:'11px',fontWeight:600}}>✓ QUEUED</span>
               <span style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text-dim)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{jobId}</span>
-              <button onClick={reset} style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--amber)',background:'none',border:'1px solid var(--amber-dim)',borderRadius:'2px',padding:'4px 10px',cursor:'pointer',letterSpacing:'0.1em'}}>NEW DROP</button>
+              <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)'}}>extracts in ≤5 min</span>
+              <button onClick={reset} style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--accent2)',background:'none',border:'1px solid var(--accent2)',borderRadius:'3px',padding:'4px 12px',cursor:'pointer',letterSpacing:'0.08em',fontWeight:600}}>
+                NEW DROP
+              </button>
             </div>
           )}
-          {status === 'error' && (
-            <div style={{animation:'fadeUp 0.3s ease',background:'rgba(248,113,113,0.06)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:'4px',padding:'14px 18px',display:'flex',alignItems:'center',gap:'12px'}}>
-              <span style={{color:'var(--red)',fontFamily:'var(--mono)',fontSize:'12px'}}>✗ ERROR</span>
+          {status==='error' && (
+            <div style={{animation:'fadeUp 0.25s ease',background:'var(--red-bg)',border:'1px solid #f5c6c2',borderRadius:'4px',padding:'12px 16px',display:'flex',alignItems:'center',gap:'12px'}}>
+              <span style={{color:'var(--red)',fontFamily:'var(--mono)',fontSize:'11px',fontWeight:600}}>✗ ERROR</span>
               <span style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text-dim)',flex:1}}>{errMsg}</span>
-              <button onClick={() => setStatus('idle')} style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--red)',background:'none',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'2px',padding:'4px 10px',cursor:'pointer'}}>RETRY</button>
+              <button onClick={()=>setStatus('idle')} style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--red)',background:'none',border:'1px solid var(--red)',borderRadius:'3px',padding:'4px 12px',cursor:'pointer'}}>
+                RETRY
+              </button>
             </div>
           )}
 
           {/* Drop zone */}
           <div
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
+            onDragOver={e=>{e.preventDefault();setDragOver(true)}}
+            onDragLeave={()=>setDragOver(false)}
             onDrop={handleDrop}
-            style={{position:'relative',borderRadius:'4px',border:`1px solid ${dragOver ? 'var(--amber)' : 'var(--border-hi)'}`,transition:'border-color 0.15s, box-shadow 0.15s',boxShadow:dragOver ? '0 0 0 1px var(--amber),0 0 24px rgba(245,166,35,0.1)' : 'none'}}>
+            style={{
+              background:'var(--surface)',
+              border:`1.5px solid ${dragOver?'#1e7e2e':'var(--border)'}`,
+              borderRadius:'6px',
+              boxShadow: dragOver ? '0 0 0 3px rgba(30,126,46,0.1)' : 'var(--shadow)',
+              transition:'border-color 0.15s,box-shadow 0.15s',
+              overflow:'hidden',
+              position:'relative',
+            }}>
             {dragOver && (
-              <div style={{position:'absolute',inset:0,background:'rgba(245,166,35,0.04)',borderRadius:'4px',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,pointerEvents:'none'}}>
-                <span style={{fontFamily:'var(--mono)',fontSize:'12px',color:'var(--amber)',letterSpacing:'0.2em'}}>RELEASE TO DROP</span>
+              <div style={{position:'absolute',inset:0,background:'rgba(30,126,46,0.03)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:10,pointerEvents:'none',borderRadius:'6px'}}>
+                <span style={{fontFamily:'var(--mono)',fontSize:'12px',color:'var(--green)',fontWeight:600,letterSpacing:'0.15em'}}>RELEASE TO DROP</span>
               </div>
             )}
-            <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'10px 14px',borderBottom:'1px solid var(--border)',background:'var(--surface)'}}>
-              <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.15em'}}>CONTENT</span>
-              {charCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--muted)'}}>{charCount.toLocaleString()} CHARS</span>}
-              {codeBlockCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--amber)'}}>⌥ {codeBlockCount} CODE {codeBlockCount===1?'BLOCK':'BLOCKS'}</span>}
-              {paraCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>¶ {paraCount} PARA</span>}
+
+            {/* Toolbar */}
+            <div style={{display:'flex',alignItems:'center',gap:'10px',padding:'9px 14px',borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}>
+              <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.12em',fontWeight:600}}>CONTENT</span>
+              {charCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)',marginLeft:'4px'}}>{charCount.toLocaleString()} chars</span>}
+              {codeBlockCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--amber)',background:'var(--amber-bg)',padding:'1px 7px',borderRadius:'3px',fontWeight:500}}>⌥ {codeBlockCount} code block{codeBlockCount>1?'s':''}</span>}
+              {paraCount > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)'}}>¶ {paraCount} para</span>}
+              {text && <button onClick={()=>{setText('');setCharCount(0);}} style={{marginLeft:'auto',fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 8px',borderRadius:'3px',transition:'background 0.1s'}} onMouseEnter={e=>(e.currentTarget.style.background='var(--border)')} onMouseLeave={e=>(e.currentTarget.style.background='none')}>clear</button>}
             </div>
+
             <textarea
               ref={textRef}
               value={text}
-              onChange={e => setText(e.target.value)}
+              onChange={e=>{setText(e.target.value);setCharCount(e.target.value.length)}}
               onPaste={handlePaste}
-              placeholder={"Paste content here — LLM responses, code blocks, articles, transcripts.\n\nAnything with explanations or code will be extracted automatically.\n\nDrag & drop also works."}
+              placeholder={"Paste content here — LLM responses, code blocks, article text, chat transcripts.\n\nLLM explanations and code blocks are extracted automatically.\n\nDrag & drop text or URLs also works."}
               autoFocus
-              disabled={status === 'submitting'}
-              style={{width:'100%',minHeight:'280px',resize:'vertical',background:'transparent',border:'none',outline:'none',fontFamily:'var(--mono)',fontSize:'12.5px',lineHeight:'1.7',color:'var(--text)',padding:'16px 14px',letterSpacing:'0.01em'}}
+              disabled={status==='submitting'}
+              style={{
+                width:'100%', minHeight:'300px', resize:'vertical',
+                background:'var(--surface)', border:'none', outline:'none',
+                fontFamily:'var(--mono)', fontSize:'13px', lineHeight:'1.7',
+                color:'var(--text)', padding:'16px 14px',
+                letterSpacing:'0.01em',
+              }}
             />
           </div>
 
+          {/* Metadata */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}}>
-            {[
-              {label:'SOURCE URL', val:url, set:setUrl, ph:'https://...', type:'url'},
-              {label:'PROJECT', val:project, set:setProject, isSelect:true},
-              {label:'TAGS  comma-sep', val:tags, set:setTags, ph:'rdti, supabase, bridge'},
-              {label:'NOTES', val:notes, set:setNotes, ph:'optional context'},
-            ].map(({label, val, set, ph, isSelect}) => (
-              <div key={label} style={{display:'flex',flexDirection:'column',gap:'6px'}}>
-                <label style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.15em'}}>{label}</label>
-                {isSelect ? (
-                  <select value={val} onChange={e => (set as any)(e.target.value)} disabled={status==='submitting'}
-                    style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'3px',padding:'9px 12px',fontFamily:'var(--mono)',fontSize:'11px',color:val?'var(--text)':'var(--muted)',outline:'none',appearance:'none',cursor:'pointer'}}>
-                    {PROJECTS.map(p => <option key={p} value={p} style={{background:'var(--bg)'}}>{p || '— none —'}</option>)}
-                  </select>
-                ) : (
-                  <input value={val} onChange={e => (set as any)(e.target.value)} placeholder={ph}
-                    disabled={status==='submitting'}
-                    style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'3px',padding:'9px 12px',fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text)',outline:'none',transition:'border-color 0.15s'}}
-                    onFocus={e => e.currentTarget.style.borderColor='var(--border-hi)'}
-                    onBlur={e => e.currentTarget.style.borderColor='var(--border)'}
-                  />
-                )}
-              </div>
-            ))}
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <label style={labelStyle}>Source URL</label>
+              <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://..." disabled={status==='submitting'} style={inputStyle}
+                onFocus={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.boxShadow='0 0 0 2px rgba(0,0,0,0.06)'}}
+                onBlur={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.boxShadow='none'}}
+              />
+            </div>
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <label style={labelStyle}>Project</label>
+              <select value={project} onChange={e=>setProject(e.target.value)} disabled={status==='submitting'}
+                style={{...inputStyle,appearance:'none',cursor:'pointer',color:project?'var(--text)':'var(--text-faint)'}}>
+                {PROJECTS.map(p=><option key={p} value={p}>{p||'— none —'}</option>)}
+              </select>
+            </div>
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <label style={labelStyle}>Tags <span style={{color:'var(--text-faint)',textTransform:'none',letterSpacing:0}}>comma-separated</span></label>
+              <input value={tags} onChange={e=>setTags(e.target.value)} placeholder="rdti, supabase, bridge" disabled={status==='submitting'} style={inputStyle}
+                onFocus={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.boxShadow='0 0 0 2px rgba(0,0,0,0.06)'}}
+                onBlur={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.boxShadow='none'}}
+              />
+            </div>
+            <div style={{display:'flex',flexDirection:'column'}}>
+              <label style={labelStyle}>Notes</label>
+              <input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="optional context" disabled={status==='submitting'} style={inputStyle}
+                onFocus={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.boxShadow='0 0 0 2px rgba(0,0,0,0.06)'}}
+                onBlur={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.boxShadow='none'}}
+              />
+            </div>
           </div>
 
-          <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
-            <button onClick={submit}
-              disabled={!text.trim() || status==='submitting' || status==='done'}
-              style={{fontFamily:'var(--mono)',fontSize:'11px',letterSpacing:'0.2em',background:text.trim()&&status==='idle'?'var(--amber)':'var(--surface)',color:text.trim()&&status==='idle'?'#000':'var(--muted)',border:`1px solid ${text.trim()&&status==='idle'?'var(--amber)':'var(--border)'}`,borderRadius:'3px',padding:'11px 28px',cursor:text.trim()?'pointer':'default',transition:'all 0.15s',textTransform:'uppercase',opacity:status==='submitting'?0.6:1}}>
-              {status==='submitting'?'QUEUEING...':status==='done'?'QUEUED ✓':'DROP INTO QUEUE'}
+          {/* Submit row */}
+          <div style={{display:'flex',alignItems:'center',gap:'14px',paddingTop:'2px'}}>
+            <button
+              onClick={submit}
+              disabled={!text.trim()||status==='submitting'||status==='done'}
+              style={{
+                fontFamily:'var(--mono)', fontSize:'11px', letterSpacing:'0.15em', fontWeight:600,
+                background: text.trim()&&status==='idle' ? 'var(--accent)' : 'var(--surface2)',
+                color: text.trim()&&status==='idle' ? '#fff' : 'var(--text-faint)',
+                border: `1px solid ${text.trim()&&status==='idle'?'var(--accent)':'var(--border)'}`,
+                borderRadius:'4px', padding:'11px 28px', cursor: text.trim()&&status==='idle'?'pointer':'default',
+                transition:'all 0.15s', textTransform:'uppercase',
+                boxShadow: text.trim()&&status==='idle' ? 'var(--shadow)' : 'none',
+              }}
+              onMouseEnter={e=>{if(text.trim()&&status==='idle')e.currentTarget.style.background='#333'}}
+              onMouseLeave={e=>{if(status==='idle')e.currentTarget.style.background=text.trim()?'var(--accent)':'var(--surface2)'}}
+            >
+              {status==='submitting'?'Queuing...':status==='done'?'Queued ✓':'Drop into Queue'}
             </button>
-            <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>⌘↵ to submit</span>
-            {status==='idle' && text && (
-              <button onClick={reset} style={{marginLeft:'auto',fontFamily:'var(--mono)',fontSize:'10px',color:'var(--muted)',background:'none',border:'none',cursor:'pointer',letterSpacing:'0.1em'}}>CLEAR</button>
-            )}
+            <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)'}}>⌘↵</span>
           </div>
         </main>
 
-        <aside style={{width:'240px',borderLeft:'1px solid var(--border)',padding:'20px 16px',display:'flex',flexDirection:'column',gap:'12px'}}>
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.2em'}}>RECENT DROPS</div>
-            {history.length > 0 && (
-              <button onClick={clearHistory} style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--muted)',background:'none',border:'none',cursor:'pointer',letterSpacing:'0.1em'}}>CLEAR</button>
-            )}
-          </div>
-          {history.length === 0 ? (
-            <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--border-hi)',lineHeight:'1.8'}}>—<br/>nothing yet</div>
-          ) : history.map(h => (
-            <div key={h.id} style={{borderLeft:'2px solid var(--amber-dim)',paddingLeft:'10px',animation:'fadeUp 0.3s ease'}}>
-              <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--amber)',marginBottom:'2px'}}>{h.proj}</div>
-              {h.url && <div style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-dim)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'180px'}} title={h.url}>{h.url.replace(/^https?:\/\//,'')}</div>}
-              <div style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--muted)'}}>{h.chars.toLocaleString()} chars · {h.ts}</div>
+        {/* Sidebar */}
+        <aside style={{width:'220px',borderLeft:'1px solid var(--border)',padding:'20px 16px',display:'flex',flexDirection:'column',gap:'10px',background:'var(--surface)'}}>
+          <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.15em',fontWeight:600,marginBottom:'2px'}}>RECENT DROPS</div>
+          {history.length===0 ? (
+            <div style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text-faint)',lineHeight:'1.8'}}>Nothing yet</div>
+          ) : history.map(h=>(
+            <div key={h.id} style={{borderLeft:'2px solid var(--border-hi)',paddingLeft:'10px',animation:'fadeUp 0.25s ease'}}>
+              <div style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--text)',fontWeight:500}}>{h.proj}</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)'}}>{h.chars.toLocaleString()} chars</div>
+              <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)'}}>{h.ts}</div>
             </div>
           ))}
 
           <div style={{marginTop:'auto',borderTop:'1px solid var(--border)',paddingTop:'16px'}}>
-            <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.15em',marginBottom:'10px'}}>PIPELINE</div>
-            {['INTAKE','CLAIM','EXTRACT','PERSIST'].map(step => (
+            <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.12em',fontWeight:600,marginBottom:'10px'}}>PIPELINE</div>
+            {['INTAKE','CLAIM','EXTRACT','PERSIST'].map(step=>(
               <div key={step} style={{display:'flex',alignItems:'center',gap:'8px',marginBottom:'6px'}}>
-                <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'var(--green)',boxShadow:'0 0 6px var(--green)',flexShrink:0}}/>
-                <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-dim)',letterSpacing:'0.1em'}}>{step}</span>
+                <div style={{width:'6px',height:'6px',borderRadius:'50%',background:'var(--green)',flexShrink:0}}/>
+                <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-dim)',letterSpacing:'0.08em'}}>{step}</span>
               </div>
             ))}
-            <div style={{marginTop:'12px',fontFamily:'var(--mono)',fontSize:'9px',color:'var(--muted)',lineHeight:'1.7'}}>
-              Worker polls every 5m.<br/>Artifacts in ≤5min.
+            <div style={{marginTop:'10px',fontFamily:'var(--mono)',fontSize:'10px',color:'var(--text-faint)',lineHeight:'1.7'}}>
+              Worker polls every 5m.<br/>
+              Artifacts in ≤5 min.
             </div>
           </div>
         </aside>
