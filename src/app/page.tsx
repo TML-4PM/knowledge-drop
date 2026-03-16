@@ -12,7 +12,7 @@ const PROJECT_COLORS: Record<string,string> = {
 const SUPA_URL  = 'https://lzfgigiyqpuuxslsygjt.supabase.co';
 const ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx6ZmdpZ2l5cXB1dXhzbHN5Z2p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ0MTc0NjksImV4cCI6MjA1OTk5MzQ2OX0.qUNzDEr2rxjRSClh5P4jeDv_18_yCCkFXTizJqNYSgg';
 
-type Stats = { edu: number; code: number; jobs: number; today: number };
+type Stats = { edu: number; code: number; jobs: number; today: number; queued: number; errors: number; retrying: number };
 
 function Tag({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
@@ -345,15 +345,20 @@ export default function DropZone() {
 
           {/* Stats */}
           {stats && (
-            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'12px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px',marginBottom:'4px'}}>
-              {[['edu_snippets','var(--green)','EDU',stats.edu],['code_snippets','var(--amber)','CODE',stats.code]].map(([,color,label,val])=>(
-                <div key={label as string}>
-                  <div style={{fontFamily:'var(--mono)',fontSize:'18px',fontWeight:700,color:color as string,lineHeight:1}}>{val as number}</div>
-                  <div style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-4)',letterSpacing:'0.1em',marginTop:'2px'}}>{label as string}</div>
-                </div>
-              ))}
-              <div style={{gridColumn:'1/-1',borderTop:'1px solid var(--border)',paddingTop:'8px',marginTop:'2px'}}>
-                <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-4)'}}>{stats.jobs} jobs total · {stats.today} today</span>
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:'12px',marginBottom:'4px'}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+                {([['var(--green)','EDU',stats.edu],['var(--amber)','CODE',stats.code]] as [string,string,number][]).map(([color,label,val])=>(
+                  <div key={label}>
+                    <div style={{fontFamily:'var(--mono)',fontSize:'18px',fontWeight:700,color,lineHeight:1}}>{val}</div>
+                    <div style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-4)',letterSpacing:'0.1em',marginTop:'2px'}}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{borderTop:'1px solid var(--border)',paddingTop:'8px',marginTop:'10px',display:'flex',flexDirection:'column',gap:'3px'}}>
+                <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--text-4)'}}>{stats.jobs} done · {stats.today} today</span>
+                {stats.queued > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--blue)',fontWeight:500}}>⟳ {stats.queued} in queue</span>}
+                {stats.retrying > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--amber)',fontWeight:500}}>↻ {stats.retrying} retrying</span>}
+                {stats.errors > 0 && <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--red)',fontWeight:500}}>✗ {stats.errors} dead (3 attempts)</span>}
               </div>
             </div>
           )}
