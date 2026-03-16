@@ -1,46 +1,43 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:        #f5f4f0;
-  --surface:   #ffffff;
-  --surface2:  #eeecea;
-  --border:    #d4d0c8;
-  --border-hi: #b8b4aa;
-  --accent:    #1a1a1a;
-  --accent2:   #2c5f2e;
-  --amber:     #c47600;
-  --amber-bg:  #fff4e0;
-  --green:     #1e7e2e;
-  --green-bg:  #f0faf1;
-  --red:       #c0392b;
-  --red-bg:    #fdf2f1;
-  --muted:     #888;
-  --text:      #1a1a1a;
-  --text-dim:  #555;
-  --text-faint:#999;
-  --mono:      'IBM Plex Mono', monospace;
-  --sans:      'IBM Plex Sans', sans-serif;
-  --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --bg:         #f2f1ed;
+  --surface:    #ffffff;
+  --surface2:   #f7f6f3;
+  --surface3:   #eeecea;
+  --border:     #dedad4;
+  --border-hi:  #c8c4bc;
+  --accent:     #111111;
+  --green:      #1a6e28;
+  --green-bg:   #edf7ee;
+  --green-bd:   #b6debb;
+  --amber:      #9a5e00;
+  --amber-bg:   #fdf5e6;
+  --amber-bd:   #e8c97a;
+  --red:        #b83232;
+  --red-bg:     #fdf1f1;
+  --red-bd:     #f0b8b8;
+  --blue:       #1a4e8a;
+  --blue-bg:    #eef4fc;
+  --text:       #111111;
+  --text-2:     #444444;
+  --text-3:     #777777;
+  --text-4:     #aaaaaa;
+  --mono:       'IBM Plex Mono', monospace;
+  --sans:       'IBM Plex Sans', sans-serif;
+  --r:          5px;
+  --sh:         0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --sh-md:      0 4px 16px rgba(0,0,0,0.07), 0 1px 4px rgba(0,0,0,0.04);
 }
 
-html, body {
-  height: 100%;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--sans);
-  -webkit-font-smoothing: antialiased;
-}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
 
-::selection { background: #c8e6c9; color: #1a1a1a; }
+::selection { background: #c5dfc7; }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+@keyframes fadeUp { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+@keyframes spin { to{transform:rotate(360deg)} }
