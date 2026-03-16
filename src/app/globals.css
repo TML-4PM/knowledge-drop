@@ -1,39 +1,46 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg:       #0a0a0a;
-  --surface:  #111111;
-  --border:   #1e1e1e;
-  --border-hi: #2e2e2e;
-  --amber:    #f5a623;
-  --amber-dim: #7a5112;
-  --green:    #4ade80;
-  --red:      #f87171;
-  --muted:    #444;
-  --text:     #d4d4d4;
-  --text-dim: #666;
-  --mono:     'IBM Plex Mono', monospace;
-  --sans:     'IBM Plex Sans', sans-serif;
+  --bg:        #f5f4f0;
+  --surface:   #ffffff;
+  --surface2:  #eeecea;
+  --border:    #d4d0c8;
+  --border-hi: #b8b4aa;
+  --accent:    #1a1a1a;
+  --accent2:   #2c5f2e;
+  --amber:     #c47600;
+  --amber-bg:  #fff4e0;
+  --green:     #1e7e2e;
+  --green-bg:  #f0faf1;
+  --red:       #c0392b;
+  --red-bg:    #fdf2f1;
+  --muted:     #888;
+  --text:      #1a1a1a;
+  --text-dim:  #555;
+  --text-faint:#999;
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'IBM Plex Sans', sans-serif;
+  --shadow:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
 }
 
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
 
-::selection { background: var(--amber); color: #000; }
+::selection { background: #c8e6c9; color: #1a1a1a; }
 
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
 
-@keyframes scan {
-  0%   { transform: translateY(-100%); opacity: 0.06; }
-  100% { transform: translateY(100vh); opacity: 0; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-@keyframes fadeUp {
-  from { opacity:0; transform: translateY(8px); }
-  to   { opacity:1; transform: translateY(0); }
-}
-@keyframes pulse-border {
-  0%,100% { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber), 0 0 20px rgba(245,166,35,0.15); }
-  50%     { border-color: var(--amber-dim); box-shadow: 0 0 0 1px var(--amber-dim); }
-}
