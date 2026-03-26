@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  openGraph: { images: ["https://pflisxkcxbzboxwidywf.supabase.co/storage/v1/object/public/images/AHC%20droid%20head.webp"] },
+  icons: { icon: "https://pflisxkcxbzboxwidywf.supabase.co/storage/v1/object/public/images/AHC%20droid%20head.webp", apple: "https://pflisxkcxbzboxwidywf.supabase.co/storage/v1/object/public/images/AHC%20droid%20head.webp" },
   title: 'Knowledge Drop',
   description: 'T4H Knowledge Intake — drop content, extract artifacts',
 };
